@@ -4,5 +4,7 @@
 
 #include "Shared.xcconfig"
 
-// No additional debug-specific overrides needed
-// All debug settings use Xcode project defaults
+// Keep development builds separate from the shipped app so granting
+// Accessibility access to one cannot replace the other's permission record.
+PRODUCT_DISPLAY_NAME = Loupe Debug
+PRODUCT_BUNDLE_IDENTIFIER = com.smughead.Loupe.debug

@@ -9,6 +9,7 @@ public final class OnboardingWindowController {
 
     private var window: NSWindow?
     private var permissionCheckTimer: Timer?
+    private var automaticCompletionWorkItem: DispatchWorkItem?
     private var onComplete: (() -> Void)?
     private let state = OnboardingState()
 
@@ -30,12 +31,15 @@ public final class OnboardingWindowController {
                 self?.openSystemSettings()
             },
             onWatchDemo: { [weak self] in
+                self?.cancelAutomaticCompletion()
                 self?.showDemo()
             },
             onSkipDemo: { [weak self] in
+                self?.cancelAutomaticCompletion()
                 self?.fadeOutAndComplete()
             },
             onDemoFinished: { [weak self] in
+                self?.cancelAutomaticCompletion()
                 self?.state.stopVideo()
                 self?.fadeOutAndComplete()
             }
@@ -65,6 +69,7 @@ public final class OnboardingWindowController {
     /// Dismiss the onboarding window immediately (e.g., on app termination).
     public func dismiss() {
         stopPermissionPolling()
+        cancelAutomaticCompletion()
         state.stopVideo()
         window?.close()
         window = nil
@@ -126,11 +131,25 @@ public final class OnboardingWindowController {
         withAnimation(.easeOut(duration: 0.4)) {
             state.phase = .permissionGranted
         }
+
+        // Permission may be granted while System Settings is still in front.
+        // Continue automatically so the toolbar starts without requiring the
+        // user to discover and click a second confirmation back in Loupe.
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.fadeOutAndComplete()
+        }
+        automaticCompletionWorkItem = workItem
+        DispatchQueue.main.asyncAfter(
+            deadline: .now() + 1.5,
+            execute: workItem
+        )
     }
 
     // MARK: - Fade Out
 
     private func fadeOutAndComplete() {
+        cancelAutomaticCompletion()
+
         guard let window else {
             onComplete?()
             return
@@ -147,5 +166,10 @@ public final class OnboardingWindowController {
                 self?.onComplete?()
             }
         })
+    }
+
+    private func cancelAutomaticCompletion() {
+        automaticCompletionWorkItem?.cancel()
+        automaticCompletionWorkItem = nil
     }
 }
